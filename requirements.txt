@@ -1,5 +1,4 @@
 torch==1.10.0
-logging
 tqdm==4.62.3
 torchvision 
 tensorboardX 
@@ -8,3 +7,7 @@ seaborn
 scipy
 matplotlib
 imageio
+h5py
+timm
+einops
+fvcore
