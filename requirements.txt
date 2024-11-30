@@ -15,3 +15,5 @@ fvcore
 segmentation_mask_overlay
 thop
 opencv-python-headless
+einops
+zeta
