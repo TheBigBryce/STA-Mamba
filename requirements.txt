@@ -1,5 +1,5 @@
 python==3.10
-torch==1.13.0
+zetascale
 tqdm==4.62.3
 torchvision 
 tensorboardX 
@@ -16,4 +16,3 @@ segmentation_mask_overlay
 thop
 opencv-python-headless
 einops
-zeta
