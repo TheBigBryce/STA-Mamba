@@ -180,11 +180,11 @@ class VisionEncoderMambaBlock(nn.Module):
 
 
     Example:
-    >>> block = VisionMambaBlock(dim=256, heads=8, dt_rank=32,
+    #>>> block = VisionMambaBlock(dim=256, heads=8, dt_rank=32,
             dim_inner=512, d_state=256)
-    >>> x = torch.randn(1, 32, 256)
-    >>> out = block(x)
-    >>> out.shape
+    #>>> x = torch.randn(1, 32, 256)
+    #>>> out = block(x)
+    #>>> out.shape
     torch.Size([1, 32, 256])
     """
 
