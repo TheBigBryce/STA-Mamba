@@ -103,7 +103,7 @@ def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epoch
 
 
 def trainer_synapse(args, model, snapshot_path):
-    from datasets.dataset_synapse import Synapse_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
+    from block_dataset.dataset_synapse import Synapse_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
     from torchvision.transforms import functional as VF
 
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
@@ -236,7 +236,7 @@ def trainer_synapse(args, model, snapshot_path):
     return "Training Finished!"
 
 def trainer_assd(args, model, snapshot_path):
-    from datasets.dataset_synapse import ASSD_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
+    from block_dataset.dataset_synapse import ASSD_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
     from torchvision.transforms import functional as VF
 
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
