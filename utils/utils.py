@@ -22,6 +22,7 @@ import SimpleITK as sitk
 import pandas as pd
 
 import cv2
+import time
 
 from thop import profile
 from thop import clever_format
@@ -315,7 +316,10 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
             # Model inference
             net.eval()
             with torch.no_grad():
+                t1 = time.time()
                 outputs = net(input_tensor)
+                print("Inference time: ", time.time()-t1)
+
                 out = torch.argmax(torch.softmax(outputs, dim=1), dim=1).squeeze(0).cpu().detach().numpy()
 
             # Resize prediction back to original size if resized earlier
@@ -333,25 +337,25 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
 
             # Save test results if a path is provided
             if test_save_path is not None:
-                # image_slice = (image[ind, :, :] * 255).astype(np.uint8)
-                # image_slice_expanded = np.expand_dims(image_slice, axis=0)
-                # repeated_images = np.repeat(image_slice_expanded, 8, axis=0)
+                image_slice = (image[ind, :, :] * 255).astype(np.uint8)
+                image_slice_expanded = np.expand_dims(image_slice, axis=0)
+                repeated_images = np.repeat(image_slice_expanded, 8, axis=0)
 
-                # # sanity check
-                # random_bool_matrix = np.random.choice([True, False], size=(8, 512, 512))
+                # sanity check
+                random_bool_matrix = np.random.choice([True, False], size=(8, 512, 512))
 
-                # cv2.imwrite(f"{test_save_path}/{case}_{ind}_img.png", repeated_images[0])
+                cv2.imwrite(f"{test_save_path}/{case}_{ind}_img.png", repeated_images[0])
 
-                # # Overlay masks for ground truth and predictions
-                # fig_gt = custom_overlay_masks(repeated_images, masks, labels=mask_labels, colors=cmap, alpha=0.5)
-                # fig_gt.savefig(f"{test_save_path}/{case}_{ind}_gt.png", bbox_inches="tight", dpi=300)
+                # Overlay masks for ground truth and predictions
+                fig_gt = custom_overlay_masks(repeated_images, masks, labels=mask_labels, colors=cmap, alpha=0.5)
+                fig_gt.savefig(f"{test_save_path}/{case}_{ind}_gt.png", bbox_inches="tight", dpi=300)
 
-                # fig_pred = custom_overlay_masks(repeated_images, preds_o, labels=mask_labels, colors=cmap, alpha=0.5)
-                # fig_pred.savefig(f"{test_save_path}/{case}_{ind}_pred.png", bbox_inches="tight", dpi=300)
+                fig_pred = custom_overlay_masks(repeated_images, preds_o, labels=mask_labels, colors=cmap, alpha=0.5)
+                fig_pred.savefig(f"{test_save_path}/{case}_{ind}_pred.png", bbox_inches="tight", dpi=300)
 
-                # plt.close('all')  # Close plots to free memory
+                plt.close('all')  # Close plots to free memory
 
-                print(f"Saved image {test_save_path}/{case}_{ind}")
+                print(f"Saved image - {test_save_path}/{case}_{ind}")
 
 
     else:
