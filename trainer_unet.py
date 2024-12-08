@@ -170,6 +170,8 @@ def trainer_synapse(args, model, snapshot_path):
 
     for epoch_num in iterator:
         # for i_batch, (sampled_batch,dino_batch) in enumerate(trainloader):
+        loss_ce=0
+        loss_dice=0
         for i_batch, sampled_batch in enumerate(trainloader):
             image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
 
@@ -217,13 +219,14 @@ def trainer_synapse(args, model, snapshot_path):
                 writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
                 labs = label_batch[1, ...].unsqueeze(0) * 50
                 writer.add_image('train/GroundTruth', labs, iter_num)
+        print()
+        print("epoch num: {} loss_ce: {}, loss_dice: {}".format(epoch_num, loss_ce, loss_dice))
 
         # save_interval = 50  # int(max_epoch/6)
         # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
-        if epoch_num > 80:   
-            save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-            torch.save(model.state_dict(), save_mode_path)
-            logging.info("save model to {}".format(save_mode_path))
+        save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
+        torch.save(model.state_dict(), save_mode_path)
+        logging.info("save model to {}".format(save_mode_path))
 
         if epoch_num >= max_epoch - 1:
             save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
@@ -350,7 +353,7 @@ def trainer_assd(args, model, snapshot_path):
 
         # save_interval = 50  # int(max_epoch/6)
         # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
-        if epoch_num > 80:   
+        if epoch_num > 20:
             save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
             torch.save(model.state_dict(), save_mode_path)
             logging.info("save model to {}".format(save_mode_path))
