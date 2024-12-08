@@ -1,3 +1,4 @@
+from __future__ import annotations
 import argparse
 import logging
 import os
@@ -17,6 +18,7 @@ from torchvision import transforms
 # from utils import test_single_volume
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 
 class KDloss(nn.Module):
 
@@ -103,7 +105,7 @@ def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epoch
 
 
 def trainer_synapse(args, model, snapshot_path):
-    from datasets.dataset_synapse import Synapse_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
+    from block_dataset.dataset_synapse import Synapse_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
     from torchvision.transforms import functional as VF
 
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
@@ -192,6 +194,8 @@ def trainer_synapse(args, model, snapshot_path):
             loss.backward()
             optimizer.step()
 
+            if i_batch % 10 == 0:
+                print(f'Epoch {epoch_num} mini batch {i_batch} total mini batches {len(trainloader)} loss {loss}')
             # Update the learning rate using the scheduler 
         
             # lr_ = optimizer.param_groups[0]['lr']
@@ -209,14 +213,14 @@ def trainer_synapse(args, model, snapshot_path):
             logging.info('iteration %d : loss : %f, loss_dice %f loss_ce: %f' % (iter_num, loss.item(), loss_dice.item(), loss_ce.item()))
             iter_num += 1
             
-            if iter_num % 20 == 0:
-                image = image_batch[1, 0:1, :, :]
-                image = (image - image.min()) / (image.max() - image.min())
-                writer.add_image('train/Image', image, iter_num)
-                outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
-                writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-                labs = label_batch[1, ...].unsqueeze(0) * 50
-                writer.add_image('train/GroundTruth', labs, iter_num)
+            # if iter_num % 20 == 0:
+            #     image = image_batch[1, 0:1, :, :]
+            #     image = (image - image.min()) / (image.max() - image.min())
+            #     writer.add_image('train/Image', image, iter_num)
+            #     outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
+            #     writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
+            #     labs = label_batch[1, ...].unsqueeze(0) * 50
+            #     writer.add_image('train/GroundTruth', labs, iter_num)
 
         # save_interval = 50  # int(max_epoch/6)
         # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:
@@ -236,7 +240,7 @@ def trainer_synapse(args, model, snapshot_path):
     return "Training Finished!"
 
 def trainer_assd(args, model, snapshot_path):
-    from datasets.dataset_synapse import ASSD_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
+    from block_dataset.dataset_synapse import ASSD_dataset, RandomGenerator,RandomGenerator_DINO,RandomGenerator_DINO_Deform
     from torchvision.transforms import functional as VF
 
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
@@ -339,14 +343,14 @@ def trainer_assd(args, model, snapshot_path):
             logging.info('iteration %d : loss : %f, loss_dice %f loss_ce: %f' % (iter_num, loss.item(), loss_dice.item(), loss_ce.item()))
             iter_num += 1
             
-            if iter_num % 20 == 0:
-                image = image_batch[1, 0:1, :, :]
-                image = (image - image.min()) / (image.max() - image.min())
-                writer.add_image('train/Image', image, iter_num)
-                outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
-                writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-                labs = label_batch[1, ...].unsqueeze(0) * 50
-                writer.add_image('train/GroundTruth', labs, iter_num)
+            # if iter_num % 20 == 0:
+            #     image = image_batch[1, 0:1, :, :]
+            #     image = (image - image.min()) / (image.max() - image.min())
+            #     writer.add_image('train/Image', image, iter_num)
+            #     outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
+            #     writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
+            #     labs = label_batch[1, ...].unsqueeze(0) * 50
+            #     writer.add_image('train/GroundTruth', labs, iter_num)
 
         # save_interval = 50  # int(max_epoch/6)
         # if epoch_num > int(max_epoch / 2) and (epoch_num + 1) % save_interval == 0:

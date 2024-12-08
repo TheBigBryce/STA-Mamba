@@ -18,6 +18,15 @@ from fvcore.nn import flop_count_table
 from timm.models.registry import register_model
 from timm.models.vision_transformer import _cfg
 import time
+from einops import rearrange, repeat
+from einops.layers.torch import Rearrange
+from torch import nn, Tensor
+from zeta.nn import SSM
+from einops.layers.torch import Reduce
+import math
+
+from .vmamba import VSSBlock
+import time
 
 class SwishImplementation(torch.autograd.Function):
     @staticmethod
@@ -85,6 +94,106 @@ class Mlp(nn.Module):
         x = self.drop(x)
         return x
  
+
+class VisionEncoderMambaBlock(nn.Module):
+    """
+    VisionMambaBlock is a module that implements the Mamba block from the paper
+    Vision Mamba: Efficient Visual Representation Learning with Bidirectional
+    State Space Model
+
+    Args:
+        dim (int): The input dimension of the input tensor.
+        dt_rank (int): The rank of the state space model.
+        dim_inner (int): The dimension of the inner layer of the
+            multi-head attention.
+        d_state (int): The dimension of the state space model.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        dt_rank: int,
+        dim_inner: int,
+        d_state: int,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.dt_rank = dt_rank
+        self.dim_inner = dim_inner
+        self.d_state = d_state
+
+        self.forward_conv1d = nn.Conv1d(
+            in_channels=dim, out_channels=dim, kernel_size=1
+        )
+        self.backward_conv1d = nn.Conv1d(
+            in_channels=dim, out_channels=dim, kernel_size=1
+        )
+        self.norm = nn.LayerNorm(dim)
+        self.silu = nn.SiLU()
+        self.ssm = SSM(dim, dt_rank, dim_inner, d_state)
+
+        # Linear layer for z and x
+        self.proj = nn.Linear(dim, dim)
+
+        # Softplus
+        self.softplus = nn.Softplus()
+
+    def forward(self, x: torch.Tensor):
+        b, c, h, w = x.shape
+        x = x.permute(0, 2, 3, 1).reshape(b, h * w, c)
+        b, s, d = x.shape
+
+        # Skip connection
+        skip = x
+
+        # Normalization
+        # x = self.norm(x)
+
+        # Split x into x1 and x2 with linears
+        z1 = self.proj(x)
+        x = self.proj(x)
+
+        # forward con1d
+        x1 = self.process_direction(
+            x,
+            self.forward_conv1d,
+            self.ssm,
+        )
+
+        # backward conv1d
+        x2 = self.process_direction(
+            x,
+            self.backward_conv1d,
+            self.ssm,
+        )
+
+        # Activation
+        z = self.silu(z1)
+
+        # Matmul
+        x1 *= z
+        x2 *= z
+
+        y = x1 + x2
+        H = W = int(math.sqrt(s))
+        result = y.permute(0, 2, 1).reshape(b, d, H, W)
+        # Residual connection
+        return result
+
+    def process_direction(
+        self,
+        x: Tensor,
+        conv1d: nn.Conv1d,
+        ssm: SSM,
+    ):
+        x = rearrange(x, "b s d -> b d s")
+        x = self.softplus(conv1d(x))
+        # print(f"Conv1d: {x}")
+        x = rearrange(x, "b d s -> b s d")
+        x = ssm(x)
+        return x
+
+
 class Attention(nn.Module):
     def __init__(self, dim, window_size=None, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
@@ -153,7 +262,7 @@ class Fold(nn.Module):
         return x
 
 class StokenAttention(nn.Module):
-    def __init__(self, dim, stoken_size, n_iter=1, refine=True, refine_attention=True, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(self, dim, stoken_size, n_iter=1, refine=True, refine_attention=True, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., mamba_dim=14):
         super().__init__()
         
         self.n_iter = n_iter
@@ -165,19 +274,35 @@ class StokenAttention(nn.Module):
         
         self.unfold = Unfold(3)
         self.fold = Fold(3)
-        
+
         if refine:
             
             if refine_attention:
-                self.stoken_refine = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=proj_drop)
-            else:
-                self.stoken_refine = nn.Sequential(
-                    nn.Conv2d(dim, dim, 1, 1, 0),
-                    nn.Conv2d(dim, dim, 5, 1, 2, groups=dim),
-                    nn.Conv2d(dim, dim, 1, 1, 0)
-                )
+                self.stoken_refine = VSSBlock(hidden_dim=mamba_dim)
+                # self.stoken_refine = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=proj_drop)
+                # self.stoken_refine = VisionEncoderMambaBlock(dim=dim, dt_rank=16, dim_inner=dim, d_state=dim)
+                print("DIM: ", dim)
+            #     # self.stoken_refine = VSSBlock(hidden_dim=dim)
+            #     if dim==64:
+            #         self.stoken_refine = VSSBlock(hidden_dim=28)
+            #     elif dim==128:
+            #         self.stoken_refine = VSSBlock(hidden_dim=28)
+            #     elif dim==256:
+            #         self.stoken_refine = VSSBlock(hidden_dim=28)
+            #     else:
+            #         self.stoken_refine = VSSBlock(hidden_dim=14)
+            # else:
+            #     self.stoken_refine = nn.Sequential(
+            #         nn.Conv2d(dim, dim, 1
+            # , 1, 0),
+            #         nn.Conv2d(dim, dim, 5, 1, 2, groups=dim),
+            #         nn.Conv2d(dim, dim, 1, 1, 0)
+            #     )
+        # self.init = False
+
         
     def stoken_forward(self, x):
+        t1 = time.time()
         '''
            x: (B, C, H, W)
         '''
@@ -231,13 +356,22 @@ class StokenAttention(nn.Module):
         stoken_features = stoken_features/(affinity_matrix_sum.detach() + 1e-12) # (B, C, hh, ww)
         # 767
         
+        t2 = time.time()
         if self.refine:
             if self.refine_attention:
                 # stoken_features = stoken_features.reshape(B, C, hh*ww).transpose(-1, -2)
-                stoken_features = self.stoken_refine(stoken_features)
+                # print("Input to MHSA shape: ", stoken_features.shape)
+                try:
+                    stoken_features = self.stoken_refine(stoken_features)
+                except:
+                    # self.stoken_refine = VSSBlock(hidden_dim=stoken_features.shape[2])
+                    # print("CHANGED VSS dim")
+                    print("VSS DIM MISMATCH")
+                # print("Output of MHSA shape: ", stoken_features.shape)
                 # stoken_features = stoken_features.transpose(-1, -2).reshape(B, C, hh, ww)
             else:
                 stoken_features = self.stoken_refine(stoken_features)
+        t3 = time.time()
             
         # 727
         
@@ -253,6 +387,9 @@ class StokenAttention(nn.Module):
                 
         if pad_r > 0 or pad_b > 0:
             pixel_features = pixel_features[:, :, :H0, :W0]
+
+        # print("Stoken forward took: (total)", (time.time()-t1)*1000)
+        # print("VMamba time: ", (t3-t2)*1000)
         
         return pixel_features
     
@@ -279,18 +416,21 @@ class StokenAttention(nn.Module):
 class StokenAttentionLayer(nn.Module):
     def __init__(self, dim, n_iter, stoken_size, 
                  num_heads=1, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, layerscale=False, init_values = 1.0e-5):
+                 drop_path=0., act_layer=nn.GELU, layerscale=False, init_values = 1.0e-5, mamba_dim=14):
         super().__init__()
                         
         self.layerscale = layerscale
         
         self.pos_embed = ResDWC(dim, 3)
+
+        # print("STA LAYER DIM MAMBa", mamba_dim)
+
                                         
         self.norm1 = LayerNorm2d(dim)
         self.attn = StokenAttention(dim, stoken_size=stoken_size, 
                                     n_iter=n_iter,                                     
                                     num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale, 
-                                    attn_drop=attn_drop, proj_drop=drop)   
+                                    attn_drop=attn_drop, proj_drop=drop, mamba_dim=mamba_dim)   
                     
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         
@@ -316,7 +456,8 @@ class BasicLayer(nn.Module):
                  num_heads=1, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, layerscale=False, init_values = 1.0e-5,
                  downsample=False,
-                 use_checkpoint=False, checkpoint_num=None):
+                 use_checkpoint=False, checkpoint_num=None,
+                 mamba_dim=28):
         super().__init__()        
                 
         self.use_checkpoint = use_checkpoint
@@ -327,7 +468,7 @@ class BasicLayer(nn.Module):
                                            num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale, 
                                            drop=drop, attn_drop=attn_drop, drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                                            act_layer=act_layer, 
-                                           layerscale=layerscale, init_values=init_values) for i in range(num_layers)])
+                                           layerscale=layerscale, init_values=init_values, mamba_dim=mamba_dim) for i in range(num_layers)])
                                            
                                                                            
                 

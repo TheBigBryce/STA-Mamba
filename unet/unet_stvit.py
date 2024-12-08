@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .stvit import BasicLayer
+from .stvit import BasicLayer, VisionEncoderMambaBlock
 import torch.nn.functional as F
 import numpy as np
 import os
@@ -124,31 +124,36 @@ class UNet_STA(nn.Module):
     def __init__(self, n_in, n_class):
         super().__init__()
 
-        """ Encoder """
+        # 3 and 4
+        # # """ Encoder """
         self.e1 = encoder_block(n_in, 64)
         self.e_svl1 = BasicLayer(num_layers=1,
-                               dim=[64,64],                              
+                               dim=[64,64],  
+                               mamba_dim=28,                            
                                n_iter=1,
                                stoken_size=[4,4],                                                       
                                num_heads=2
                             )
         self.e2 = encoder_block(64, 128)
         self.e_svl2 = BasicLayer(num_layers=2,
-                               dim=[128,128],                              
+                               dim=[128,128],
+                               mamba_dim=28,                              
                                n_iter=1,
                                stoken_size=[2,2],                                                       
                                num_heads=4
                             )
         self.e3 = encoder_block(128, 256)
         self.e_svl3 = BasicLayer(num_layers=3,
-                               dim=[256,256],                              
+                               dim=[256,256],    
+                               mamba_dim=28,                          
                                n_iter=1,
                                stoken_size=[1,1],                                                       
                                num_heads=8
                             )
         self.e4 = encoder_block(256, 512)
         self.e_svl4 = BasicLayer(num_layers=4,
-                               dim=[512,512],                              
+                               dim=[512,512], 
+                               mamba_dim=14,                             
                                n_iter=1,
                                stoken_size=[1,1],                                                       
                                num_heads=16
@@ -162,7 +167,8 @@ class UNet_STA(nn.Module):
         self.d1 = decoder_block(1024, 512)
         # self.d1 = decoder_block_w_attn(1024,512)
         self.d_svl1 = BasicLayer(num_layers=4,
-                               dim=[512,512],                              
+                               dim=[512,512],
+                               mamba_dim=28,                              
                                n_iter=1,
                                stoken_size=[1,1],                                                       
                                num_heads=16
@@ -170,7 +176,8 @@ class UNet_STA(nn.Module):
         self.d2 = decoder_block(512, 256)
         # self.d2 = decoder_block_w_attn(512, 256)
         self.d_svl2 = BasicLayer(num_layers=3,
-                               dim=[256,256],                              
+                               dim=[256,256],    
+                               mamba_dim=56,                          
                                n_iter=1,
                                stoken_size=[1,1],                                                       
                                num_heads=8
@@ -178,7 +185,8 @@ class UNet_STA(nn.Module):
         self.d3 = decoder_block(256, 128)
         # self.d3 = decoder_block_w_attn(256, 128)
         self.d_svl3 = BasicLayer(num_layers=2,
-                               dim=[128,128],                              
+                               dim=[128,128],    
+                               mamba_dim=56,                          
                                n_iter=1,
                                stoken_size=[2,2],                                                       
                                num_heads=4
@@ -186,16 +194,172 @@ class UNet_STA(nn.Module):
         self.d4 = decoder_block(128, 64)
         # self.d4 = decoder_block_w_attn(128, 64)
         self.d_svl4 = BasicLayer(num_layers=1,
-                               dim=[64,64],                              
+                               dim=[64,64],    
+                               mamba_dim=56,                          
                                n_iter=1,
                                stoken_size=[4,4],                                                       
                                num_heads=2
                             )
-        # """ Classifier """
-        # self.outputs = nn.Conv2d(64, 1, kernel_size=1, padding=0)
 
         """Semantic Segmentation"""
         self.outputs = nn.Conv2d(64, n_class, kernel_size=1, padding=0)
+
+
+        # # """ Encoder """
+        # self.e1 = encoder_block(n_in, 32)
+        # self.e_svl1 = BasicLayer(num_layers=1,
+        #                        dim=[32,32],                              
+        #                        n_iter=1,
+        #                        stoken_size=[4,4],                                                       
+        #                        num_heads=2
+        #                     )
+        # self.e2 = encoder_block(32, 64)
+        # self.e_svl2 = BasicLayer(num_layers=1,
+        #                        dim=[64,64],                              
+        #                        n_iter=1,
+        #                        stoken_size=[2,2],                                                       
+        #                        num_heads=4
+        #                     )
+        # self.e3 = encoder_block(64, 128)
+        # self.e_svl3 = BasicLayer(num_layers=1,
+        #                        dim=[128,128],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=8
+        #                     )
+        # self.e4 = encoder_block(128, 256)
+        # self.e_svl4 = BasicLayer(num_layers=1,
+        #                        dim=[256,256],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=16
+        #                     )
+
+        # """ Bottleneck """
+        # self.b = conv_block(256, 512)
+        # # self.b = conv_block(128, 256)
+
+        # """ Decoder """
+        # self.d1 = decoder_block(512, 256)
+        # # self.d1 = decoder_block_w_attn(1024,256)
+        # self.d_svl1 = BasicLayer(num_layers=1,
+        #                        dim=[256,256],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=16
+        #                     )
+        # self.d2 = decoder_block(256, 128)
+        # # self.d2 = decoder_block_w_attn(256, 128)
+        # self.d_svl2 = BasicLayer(num_layers=1,
+        #                        dim=[128,128],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=8
+        #                     )
+        # self.d3 = decoder_block(128, 64)
+        # # self.d3 = decoder_block_w_attn(128, 64)
+        # self.d_svl3 = BasicLayer(num_layers=1,
+        #                        dim=[64,64],                              
+        #                        n_iter=1,
+        #                        stoken_size=[2,2],                                                       
+        #                        num_heads=4
+        #                     )
+        # self.d4 = decoder_block(64, 32)
+        # # self.d4 = decoder_block_w_attn(64, 32)
+        # self.d_svl4 = BasicLayer(num_layers=1,
+        #                        dim=[32,32],                              
+        #                        n_iter=1,
+        #                        stoken_size=[4,4],                                                       
+        #                        num_heads=2
+        #                     )
+
+        # """Semantic Segmentation"""
+        # self.outputs = nn.Conv2d(32, n_class, kernel_size=1, padding=0)
+
+
+
+
+
+
+        # 1 and 2
+        # # """ Encoder """
+        # self.e1 = encoder_block(n_in, 64)
+        # self.e_svl1 = BasicLayer(num_layers=1,
+        #                        dim=[64,64],                              
+        #                        n_iter=1,
+        #                        stoken_size=[4,4],                                                       
+        #                        num_heads=2
+        #                     )
+        # self.e2 = encoder_block(64, 128)
+        # self.e_svl2 = BasicLayer(num_layers=1,
+        #                        dim=[128,128],                              
+        #                        n_iter=1,
+        #                        stoken_size=[2,2],                                                       
+        #                        num_heads=4
+        #                     )
+        # self.e3 = encoder_block(128, 256)
+        # self.e_svl3 = BasicLayer(num_layers=1,
+        #                        dim=[256,256],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=8
+        #                     )
+        # self.e4 = encoder_block(256, 512)
+        # self.e_svl4 = BasicLayer(num_layers=1,
+        #                        dim=[512,512],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=16
+        #                     )
+
+        # """ Bottleneck """
+        # self.b = conv_block(512, 1024)
+        # # self.b = conv_block(256, 512)
+
+        # """ Decoder """
+        # self.d1 = decoder_block(1024, 512)
+        # # self.d1 = decoder_block_w_attn(1024,512)
+        # self.d_svl1 = BasicLayer(num_layers=1,
+        #                        dim=[512,512],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=16
+        #                     )
+        # self.d2 = decoder_block(512, 256)
+        # # self.d2 = decoder_block_w_attn(512, 256)
+        # self.d_svl2 = BasicLayer(num_layers=1,
+        #                        dim=[256,256],                              
+        #                        n_iter=1,
+        #                        stoken_size=[1,1],                                                       
+        #                        num_heads=8
+        #                     )
+        # self.d3 = decoder_block(256, 128)
+        # # self.d3 = decoder_block_w_attn(256, 128)
+        # self.d_svl3 = BasicLayer(num_layers=1,
+        #                        dim=[128,128],                              
+        #                        n_iter=1,
+        #                        stoken_size=[2,2],                                                       
+        #                        num_heads=4
+        #                     )
+        # self.d4 = decoder_block(128, 64)
+        # # self.d4 = decoder_block_w_attn(128, 64)
+        # self.d_svl4 = BasicLayer(num_layers=1,
+        #                        dim=[64,64],                              
+        #                        n_iter=1,
+        #                        stoken_size=[4,4],                                                       
+        #                        num_heads=2
+        #                     )
+
+        # """Semantic Segmentation"""
+        # self.outputs = nn.Conv2d(64, n_class, kernel_size=1, padding=0)
+
+
+
+
+
+
+
+
 
     def forward(self, inputs):
         
@@ -242,6 +406,8 @@ class UNet_STA(nn.Module):
         d4 = self.d_svl4(d4)
         # d_numpy = d4.cpu().detach().numpy()
         # np.save(f'./extracted_features/slice_{n_slice}/d4.npy', d_numpy)
+
+        
         
         """ Semantic Segmentation"""
         outputs = self.outputs(d4)
