@@ -156,11 +156,11 @@ def calculate_metric_percase(pred, gt):
     gt[gt > 0] = 1
     if pred.sum() > 0 and gt.sum()>0:
         dice = metric.binary.dc(pred, gt)
-        # hd95 = metric.binary.hd95(pred, gt)
-        # jaccard = metric.binary.jc(pred, gt)
-        # asd = metric.binary.assd(pred, gt)
-        # return dice, hd95, jaccard, asd
-        return dice,0,0,0
+        hd95 = metric.binary.hd95(pred, gt)
+        jaccard = metric.binary.jc(pred, gt)
+        asd = metric.binary.assd(pred, gt)
+        return dice, hd95, jaccard, asd
+        # return dice,0,0,0
     elif pred.sum() > 0 and gt.sum()==0:
         return 1, 0, 1, 0
     else:
@@ -296,7 +296,13 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
 
         for ind in range(image.shape[0]):
 
-            ind = 101
+        # for ind in range(102, 103):
+
+            if np.sum(label[ind,:,:]) == 0:
+
+                continue
+
+            # ind = 105
             slice = image[ind, :, :]
             x, y = slice.shape[0], slice.shape[1]
 
@@ -327,25 +333,26 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
 
             # Save test results if a path is provided
             if test_save_path is not None:
-                image_slice = (image[ind, :, :] * 255).astype(np.uint8)
-                image_slice_expanded = np.expand_dims(image_slice, axis=0)
-                repeated_images = np.repeat(image_slice_expanded, 8, axis=0)
+                # image_slice = (image[ind, :, :] * 255).astype(np.uint8)
+                # image_slice_expanded = np.expand_dims(image_slice, axis=0)
+                # repeated_images = np.repeat(image_slice_expanded, 8, axis=0)
 
-                # sanity check
-                random_bool_matrix = np.random.choice([True, False], size=(8, 512, 512))
+                # # sanity check
+                # random_bool_matrix = np.random.choice([True, False], size=(8, 512, 512))
 
-                cv2.imwrite(f"{test_save_path}/{case}_{ind}_img.png", repeated_images[0])
+                # cv2.imwrite(f"{test_save_path}/{case}_{ind}_img.png", repeated_images[0])
 
-                # Overlay masks for ground truth and predictions
-                fig_gt = custom_overlay_masks(repeated_images, masks, labels=mask_labels, colors=cmap, alpha=0.5)
-                fig_gt.savefig(f"{test_save_path}/{case}_{ind}_gt.png", bbox_inches="tight", dpi=300)
+                # # Overlay masks for ground truth and predictions
+                # fig_gt = custom_overlay_masks(repeated_images, masks, labels=mask_labels, colors=cmap, alpha=0.5)
+                # fig_gt.savefig(f"{test_save_path}/{case}_{ind}_gt.png", bbox_inches="tight", dpi=300)
 
-                fig_pred = custom_overlay_masks(repeated_images, preds_o, labels=mask_labels, colors=cmap, alpha=0.5)
-                fig_pred.savefig(f"{test_save_path}/{case}_{ind}_pred.png", bbox_inches="tight", dpi=300)
+                # fig_pred = custom_overlay_masks(repeated_images, preds_o, labels=mask_labels, colors=cmap, alpha=0.5)
+                # fig_pred.savefig(f"{test_save_path}/{case}_{ind}_pred.png", bbox_inches="tight", dpi=300)
 
-                plt.close('all')  # Close plots to free memory
+                # plt.close('all')  # Close plots to free memory
 
-                pdb.set_trace()
+                print(f"Saved image {test_save_path}/{case}_{ind}")
+
 
     else:
         input = torch.from_numpy(image).unsqueeze(
@@ -362,6 +369,9 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
     
     for i in range(1, classes):
         metric_list.append(calculate_metric_percase(prediction == i, label == i))
+        metric = calculate_metric_percase(prediction[102,:,:], label[102,:,:])
+
+        pdb.set_trace()
 
     if test_save_path is not None:
         print('here')

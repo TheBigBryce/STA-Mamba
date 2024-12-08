@@ -85,6 +85,9 @@ def inference(args, model, test_save_path=None):
         metric_list += np.array(metric_i)
         
         logging.info('idx %d case %s mean_dice %f mean_hd95 %f' % (i_batch, case_name, np.mean(metric_i, axis=0)[0], np.mean(metric_i, axis=0)[1]))
+
+        pdb.set_trace()
+
     metric_list = metric_list / len(db_test)
     for i in range(1, args.num_classes):
         logging.info('Mean class %d mean_dice %f mean_hd95 %f' % (i, metric_list[i-1][0], metric_list[i-1][1]))
