@@ -9,11 +9,11 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from datasets.dataset_synapse import Synapse_dataset
 from utils.utils import test_single_volume
 from unet.unet_stvit import UNet_STA
+from block_dataset.dataset_synapse import Synapse_dataset
 
-
+import pdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--volume_path', type=str,
@@ -26,7 +26,7 @@ parser.add_argument('--list_dir', type=str,
                     default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--output_dir', type=str, default='./Vanilla_Unet_exp-1',help='output dir')   
 parser.add_argument('--max_iterations', type=int,default=30000, help='maximum epoch number to train')
-parser.add_argument('--max_epochs', type=int, default=150, help='maximum epoch number to train')
+parser.add_argument('--max_epochs', type=int, default=149, help='maximum epoch number to train')
 parser.add_argument('--batch_size', type=int, default=24,
                     help='batch_size per gpu')
 parser.add_argument('--img_size', type=int, default=224, help='input patch size of network input')
@@ -39,7 +39,6 @@ parser.add_argument('--model_name', type=str,
                     default='hiformer-b', help='[hiformer-s, hiformer-b, hiformer-l]')
 parser.add_argument('--model_weight', type=str,
                     default='400', help='epoch number for prediction')
-# parser.add_argument('--cfg', type=str, required=True, metavar="FILE", help='path to config file', )
 parser.add_argument(
         "--opts",
         help="Modify config options by adding 'KEY VALUE' pairs. ",
@@ -64,10 +63,10 @@ parser.add_argument('--throughput', action='store_true', help='Test throughput o
 args = parser.parse_args()
 if args.dataset == "Synapse":
     args.volume_path = os.path.join(args.volume_path, "test_vol_h5")
-# config = get_config(args)
 
 
 def inference(args, model, test_save_path=None):
+
     db_test = args.Dataset(base_dir=args.volume_path, split="test_vol", list_dir=args.list_dir)
     testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
     logging.info("{} test iterations per epoch".format(len(testloader)))
@@ -76,19 +75,23 @@ def inference(args, model, test_save_path=None):
     for i_batch, sampled_batch in tqdm(enumerate(testloader)):
         h, w = sampled_batch["image"].size()[2:]
         image, label, case_name = sampled_batch["image"], sampled_batch["label"], sampled_batch['case_name'][0]
+
         metric_i = test_single_volume(image, label, model, classes=args.num_classes, patch_size=[args.img_size, args.img_size],
                                       test_save_path=test_save_path, case=case_name, z_spacing=args.z_spacing)
         
         metric_list += np.array(metric_i)
-        
+
         logging.info('idx %d case %s mean_dice %f mean_hd95 %f' % (i_batch, case_name, np.mean(metric_i, axis=0)[0], np.mean(metric_i, axis=0)[1]))
+
+        # pdb.set_trace()
+
     metric_list = metric_list / len(db_test)
     for i in range(1, args.num_classes):
         logging.info('Mean class %d mean_dice %f mean_hd95 %f' % (i, metric_list[i-1][0], metric_list[i-1][1]))
     performance = np.mean(metric_list, axis=0)[0]
     mean_hd95 = np.mean(metric_list, axis=0)[1]
     logging.info('Testing performance in best val model: mean_dice : %f mean_hd95 : %f' % (performance, mean_hd95))
-    # logging.info('Testing performance in best val model: mean_dice : %f' % (performance))
+    # pdb.set_trace()
     return "Testing Finished!"
 
 
@@ -131,30 +134,50 @@ if __name__ == "__main__":
     net =  UNet_STA(n_in=1, n_class=args.num_classes).cuda()
     
     
-    
-    for epoch in reversed(range(157,args.max_epochs)):
-        if (epoch+1)%2==0:
-            snapshot = os.path.join(args.output_dir, f'epoch_{epoch}.pth')
+    # pdb.set_trace() 
+    # for epoch in reversed(range(157,args.max_epochs)):
+    #     if (epoch+1)%2==0:
+    #         snapshot = os.path.join(args.output_dir, f'epoch_{epoch}.pth')
 
-            msg = net.load_state_dict(torch.load(snapshot), strict = False)
-            print("self trained vanilla unet",msg)
-            snapshot_name = f'{args.output_dir}'+snapshot.split('/')[-1]
+    #         msg = net.load_state_dict(torch.load(snapshot), strict = False)
+    #         snapshot_name = f'{args.output_dir}'+snapshot.split('/')[-1]
 
-            # log_folder = f'./test_log/test_log_{args.output_dir}'
-            log_folder = f'./test_log/'
-            os.makedirs(log_folder, exist_ok=True)
-            logging.basicConfig(filename=log_folder + '/'+snapshot_name+".txt", level=logging.INFO, format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
-            logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-            logging.info(str(args))
-            logging.info(snapshot_name)
+    #         # log_folder = f'./test_log/test_log_{args.output_dir}'
+    #         log_folder = f'./test_log/'
+    #         os.makedirs(log_folder, exist_ok=True)
+    #         logging.basicConfig(filename=log_folder + '/'+snapshot_name+".txt", level=logging.INFO, format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
+    #         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    #         logging.info(str(args))
+    #         logging.info(snapshot_name)
 
-            # if args.is_savenii:
-            args.test_save_dir = os.path.join(args.output_dir, "predictions")
-            test_save_path = args.test_save_dir 
-            os.makedirs(test_save_path, exist_ok=True)
-            # else:
-            # test_save_path = None
-            inference(args, net, test_save_path)
+    #         # if args.is_savenii:
+    #         args.test_save_dir = os.path.join(args.output_dir, "predictions")
+    #         test_save_path = args.test_save_dir 
+    #         os.makedirs(test_save_path, exist_ok=True)
+    #         # else:
+    #         # test_save_path = None
+    #         inference(args, net, test_save_path)
+
+    epoch = 125
+    snapshot = os.path.join(args.output_dir, f'epoch_{epoch}.pth')
+
+    msg = net.load_state_dict(torch.load(snapshot, map_location='cuda:0'), strict = False)
+    print("VSS Mamba",msg)
+    snapshot_name = f'{args.output_dir}'+snapshot.split('/')[-1]
+
+    log_folder = f'./test_log/'
+    os.makedirs(log_folder, exist_ok=True)
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logging.info(str(args))
+    logging.info(snapshot_name)
+
+    args.test_save_dir = os.path.join(args.output_dir, "predictions")
+    test_save_path = args.test_save_dir 
+    os.makedirs(test_save_path, exist_ok=True)
+   
+    inference(args, net, test_save_path)
+
+
 #     snapshot = os.path.join(args.output_dir, 'best_model.pth')
 #     if not os.path.exists(snapshot): snapshot = snapshot.replace('best_model', 'epoch_'+str(args.max_epochs-1))
 #     msg = net.load_state_dict(torch.load(snapshot))

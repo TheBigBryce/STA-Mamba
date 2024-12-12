@@ -101,9 +101,6 @@ if __name__ == "__main__":
     
     ## Training our model
     net =  UNet_STA(n_in=1, n_class=args.num_classes).cuda()
-    # weight = torch.load('/media/wzhu59/easystore/SelfReg-UNet/src/train_synase/ASSD pretrained weights/epoch_150.pth')
-    # net.load_state_dict(weight,strict=False)
-    # print('weights loaded')
 
     trainer = {'Synapse': trainer_synapse}
     # trainer = {'ASSD': trainer_assd}
